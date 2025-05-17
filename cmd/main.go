@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -11,6 +12,8 @@ import (
 type File struct {
 	Path    string
 	Content string
+	Type    string
+	Size    int
 }
 
 type Domain struct {
@@ -35,12 +38,21 @@ func main() {
 			return
 		}
 
-		fileFound, file := getFile(domainIndex, c.Query("file"))
+		fileFound, hit, file := getFile(domainIndex, c.Query("file"))
 		if !fileFound {
 			c.String(404, "File not found!")
 			return
 		}
 
+		if hit {
+			c.Header("Cache-Status", "HIT")
+		} else {
+			c.Header("Cache-Status", "MISS")
+		}
+
+		c.Header("Server", "TinyCDN")
+		c.Header("Content-Length", fmt.Sprintf("%d", file.Size))
+		c.Header("Content-Type", file.Type)
 		c.String(200, file.Content)
 	})
 
@@ -57,10 +69,10 @@ func getDomainIndex(domainName string) int {
 	return -1
 }
 
-func getFile(domainIndex int, filePath string) (bool, File) {
+func getFile(domainIndex int, filePath string) (bool, bool, File) {
 	for _, file := range domains[domainIndex].Files {
 		if file.Path == filePath {
-			return true, file
+			return true, true, file
 		}
 	}
 
@@ -68,18 +80,27 @@ func getFile(domainIndex int, filePath string) (bool, File) {
 	resp, err := http.Get(fileUrl)
 
 	if err != nil {
-		return false, File{}
+		return false, false, File{}
 	}
 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, File{}
+		return false, false, File{}
 	}
 
-	newFile := File{Path: filePath, Content: string(body)}
+	contentType := strings.Split(resp.Header.Get("Content-type"), ";")[0]
+	contentLength := len(body)
+
+	newFile := File{
+		Path:    filePath,
+		Content: string(body),
+		Type:    contentType,
+		Size:    contentLength,
+	}
+
 	domains[domainIndex].Files = append(domains[domainIndex].Files, newFile)
 
-	return true, newFile
+	return true, false, newFile
 }
