@@ -86,7 +86,7 @@ func getDomainIndex(domainName string) int {
 	return -1
 }
 
-func getFile(domainIndex int, filePath string, headers http.Header) (bool, bool, File) {
+func getFile(domainIndex int, filePath string, headers http.Header) (found bool, hit bool, file File) {
 	acceptsGzip := strings.Contains(headers.Get("Accept-Encoding"), "gzip")
 	encoding := EncodingNone
 	if acceptsGzip {
