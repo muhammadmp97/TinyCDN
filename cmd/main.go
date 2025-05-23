@@ -3,13 +3,18 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 type Encoding int8
@@ -29,29 +34,40 @@ type File struct {
 }
 
 type Domain struct {
-	Name  string
-	Files []File
+	Name string
 }
 
 var domains = []Domain{
 	{
-		Name:  "code.jquery.com",
-		Files: []File{},
+		Name: "code.jquery.com",
 	},
 }
+
+var ctx = context.Background()
 
 func main() {
 	router := gin.Default()
 
+	err := godotenv.Load()
+	if err != nil {
+		panic("No .env file found!")
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDRESS"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
+
 	router.GET("/g/:domain", func(c *gin.Context) {
-		domainIndex := getDomainIndex(c.Param("domain"))
-		if domainIndex == -1 {
+		found, domain := getDomain(c.Param("domain"))
+		if !found {
 			c.String(404, "Domain not found!")
 			return
 		}
 
-		fileFound, hit, file := getFile(domainIndex, c.Query("file"), c.Request.Header)
-		if !fileFound {
+		found, hit, file := getFile(rdb, domain, c.Query("file"), c.Request.Header)
+		if !found {
 			c.String(404, "File not found!")
 			return
 		}
@@ -76,30 +92,45 @@ func main() {
 	router.Run()
 }
 
-func getDomainIndex(domainName string) int {
-	for i, domain := range domains {
+func getDomain(domainName string) (found bool, domain Domain) {
+	for _, domain := range domains {
 		if domain.Name == domainName {
-			return i
+			return true, domain
 		}
 	}
 
-	return -1
+	return false, Domain{}
 }
 
-func getFile(domainIndex int, filePath string, headers http.Header) (found bool, hit bool, file File) {
+func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Header) (found bool, hit bool, file File) {
+	redisKey := fmt.Sprintf("%s/%s", domain.Name, filePath)
 	acceptsGzip := strings.Contains(headers.Get("Accept-Encoding"), "gzip")
 	encoding := EncodingNone
 	if acceptsGzip {
+		redisKey += ":gzip"
 		encoding = EncodingGZIP
 	}
 
-	for _, file := range domains[domainIndex].Files {
-		if file.Path == filePath && file.Encoding == encoding {
-			return true, true, file
+	redisKey = xxHash(redisKey)
+	redisFile, err := rdb.HGetAll(ctx, redisKey).Result()
+	if err != nil {
+		panic(err)
+	}
+
+	if len(redisFile) != 0 {
+		tmpSize, _ := strconv.Atoi(redisFile["Size"])
+		tmpOriginalSize, _ := strconv.Atoi(redisFile["Size"])
+		return true, true, File{
+			Path:         redisFile["Path"],
+			Content:      redisFile["Content"],
+			Type:         redisFile["Type"],
+			Encoding:     encoding,
+			Size:         tmpSize,
+			OriginalSize: tmpOriginalSize,
 		}
 	}
 
-	fileUrl := fmt.Sprintf("https://%s/%s", domains[domainIndex].Name, filePath)
+	fileUrl := fmt.Sprintf("https://%s/%s", domain.Name, filePath)
 	resp, err := http.Get(fileUrl)
 
 	if err != nil {
@@ -132,9 +163,21 @@ func getFile(domainIndex int, filePath string, headers http.Header) (found bool,
 		OriginalSize: originalSize,
 	}
 
-	domains[domainIndex].Files = append(domains[domainIndex].Files, newFile)
+	rdb.HSet(ctx, redisKey, map[string]interface{}{
+		"Path":         newFile.Path,
+		"Content":      newFile.Content,
+		"Type":         newFile.Type,
+		"Encoding":     strconv.Itoa(int(newFile.Encoding)),
+		"Size":         strconv.Itoa(newFile.Size),
+		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
+	})
 
 	return true, false, newFile
+}
+
+func xxHash(str string) string {
+	h := xxhash.Sum64String(str)
+	return strconv.FormatUint(h, 16)
 }
 
 func compress(content *[]byte) string {
