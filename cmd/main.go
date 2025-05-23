@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
@@ -171,6 +172,9 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 		"Size":         strconv.Itoa(newFile.Size),
 		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
 	})
+
+	ttl, _ := strconv.Atoi(os.Getenv("FILE_CACHE_TTL"))
+	rdb.Expire(ctx, redisKey, time.Hour*time.Duration(ttl))
 
 	return true, false, newFile
 }
