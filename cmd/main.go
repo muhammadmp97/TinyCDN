@@ -90,6 +90,16 @@ func main() {
 		c.String(200, file.Content)
 	})
 
+	router.POST("/purge/:domain", func(c *gin.Context) {
+		found, domain := getDomain(c.Param("domain"))
+		if !found {
+			c.String(404, "Domain not found!")
+			return
+		}
+
+		purge(rdb, domain, c.Query("file"))
+	})
+
 	router.Run()
 }
 
@@ -190,4 +200,11 @@ func compress(content *[]byte) string {
 	w.Write(*content)
 	w.Close()
 	return buffer.String()
+}
+
+func purge(rdb *redis.Client, domain Domain, filePath string) {
+	redisKey1 := fmt.Sprintf("%s/%s", domain.Name, filePath)
+	redisKey2 := fmt.Sprintf("%s/%s:gzip", domain.Name, filePath)
+
+	rdb.Del(ctx, xxHash(redisKey1), xxHash(redisKey2))
 }
