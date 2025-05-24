@@ -130,7 +130,7 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 
 	if len(redisFile) != 0 {
 		tmpSize, _ := strconv.Atoi(redisFile["Size"])
-		tmpOriginalSize, _ := strconv.Atoi(redisFile["Size"])
+		tmpOriginalSize, _ := strconv.Atoi(redisFile["OriginalSize"])
 		return true, true, File{
 			Path:         redisFile["Path"],
 			Content:      redisFile["Content"],
