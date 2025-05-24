@@ -192,7 +192,7 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 	})
 
 	ttl, _ := strconv.Atoi(os.Getenv("FILE_CACHE_TTL"))
-	rdb.Expire(ctx, redisKey, time.Hour*time.Duration(ttl))
+	rdb.Expire(ctx, redisKey, time.Second*time.Duration(ttl))
 
 	return true, false, newFile
 }
