@@ -35,11 +35,13 @@ type File struct {
 }
 
 type Domain struct {
+	Id   int16
 	Name string
 }
 
 var domains = []Domain{
 	{
+		Id:   1,
 		Name: "code.jquery.com",
 	},
 }
@@ -93,11 +95,13 @@ func main() {
 	router.POST("/purge/:domain", func(c *gin.Context) {
 		found, domain := getDomain(c.Param("domain"))
 		if !found {
-			c.String(404, "Domain not found!")
+			c.JSON(404, gin.H{"message": "Domain not found!"})
 			return
 		}
 
-		purge(rdb, domain, c.Query("file"))
+		totalDeleted := purge(rdb, domain, c.Query("file"))
+
+		c.JSON(200, gin.H{"total_deleted": totalDeleted})
 	})
 
 	router.Run()
@@ -122,7 +126,7 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 		encoding = EncodingGZIP
 	}
 
-	redisKey = xxHash(redisKey)
+	redisKey = fmt.Sprintf("tcdn:d:%d:f:%s", domain.Id, xxHash(redisKey))
 	redisFile, err := rdb.HGetAll(ctx, redisKey).Result()
 	if err != nil {
 		panic(err)
@@ -206,9 +210,45 @@ func compress(content *[]byte) string {
 	return buffer.String()
 }
 
-func purge(rdb *redis.Client, domain Domain, filePath string) {
-	redisKey1 := fmt.Sprintf("%s/%s", domain.Name, filePath)
-	redisKey2 := fmt.Sprintf("%s/%s:gzip", domain.Name, filePath)
+func purge(rdb *redis.Client, domain Domain, filePath string) (totalDeleted int64) {
+	if filePath != "" { // Purge cache by single-file
+		prefix := fmt.Sprintf("tcdn:d:%d:f:", domain.Id)
+		redisKey1 := fmt.Sprintf("%s/%s", domain.Name, filePath)
+		redisKey2 := fmt.Sprintf("%s/%s:gzip", domain.Name, filePath)
+		totalDeleted, err := rdb.Del(ctx, prefix+xxHash(redisKey1), prefix+xxHash(redisKey2)).Result()
 
-	rdb.Del(ctx, xxHash(redisKey1), xxHash(redisKey2))
+		if err != nil {
+			return 0
+		}
+
+		return totalDeleted
+	} else { // Purge cache by domain
+		prefix := fmt.Sprintf("tcdn:d:%d:f:", domain.Id)
+		batchSize := 100
+		var cursor uint64
+		totalDeleted := 0
+
+		for {
+			keys, nextCursor, err := rdb.Scan(ctx, cursor, prefix+"*", int64(batchSize)).Result()
+			if err != nil {
+				panic(err)
+			}
+
+			if len(keys) > 0 {
+				if err := rdb.Unlink(ctx, keys...).Err(); err != nil {
+					panic(err)
+				} else {
+					totalDeleted += len(keys)
+				}
+			}
+
+			if nextCursor == 0 {
+				break
+			}
+
+			cursor = nextCursor
+		}
+
+		return int64(totalDeleted)
+	}
 }
