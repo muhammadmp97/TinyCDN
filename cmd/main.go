@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -120,8 +123,9 @@ func getDomain(domainName string) (found bool, domain Domain) {
 func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Header) (found bool, hit bool, file File) {
 	redisKey := fmt.Sprintf("%s/%s", domain.Name, filePath)
 	acceptsGzip := strings.Contains(headers.Get("Accept-Encoding"), "gzip")
+	isCompressible := isCompressible(filePath)
 	encoding := EncodingNone
-	if acceptsGzip {
+	if acceptsGzip && isCompressible {
 		redisKey += ":gzip"
 		encoding = EncodingGZIP
 	}
@@ -167,7 +171,7 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 
 	originalSize := len(body)
 	var content string
-	if acceptsGzip {
+	if acceptsGzip && isCompressible {
 		content = compress(&body)
 	} else {
 		content = string(body)
@@ -200,6 +204,33 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 func xxHash(str string) string {
 	h := xxhash.Sum64String(str)
 	return strconv.FormatUint(h, 16)
+}
+
+func isCompressible(filePath string) bool {
+	parsedURL, err := url.Parse(filePath)
+	if err != nil {
+		return false
+	}
+
+	allowedExtensions := []string{
+		".html",
+		".css",
+		".js",
+		".json",
+		".xml",
+		".svg",
+		".txt",
+	}
+
+	fileExt := strings.ToLower(filepath.Ext(path.Base(parsedURL.Path)))
+
+	for _, allowedExtension := range allowedExtensions {
+		if fileExt == allowedExtension {
+			return true
+		}
+	}
+
+	return false
 }
 
 func compress(content *[]byte) string {
