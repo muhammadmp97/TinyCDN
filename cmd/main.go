@@ -150,6 +150,10 @@ func getFile(rdb *redis.Client, domain Domain, filePath string, headers http.Hea
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 && resp.StatusCode <= 504 {
+		return false, false, File{}
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, false, File{}
