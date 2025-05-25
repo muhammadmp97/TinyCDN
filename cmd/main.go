@@ -61,6 +61,7 @@ func main() {
 		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
+	defer rdb.Close()
 
 	loadDomains()
 
