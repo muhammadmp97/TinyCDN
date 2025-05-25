@@ -19,7 +19,14 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+)
+
+var (
+	cacheHit  = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "cache_hit_total"}, []string{"domain"})
+	cacheMiss = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "cache_miss_total"}, []string{"domain"})
 )
 
 type Encoding int8
@@ -49,6 +56,9 @@ var domains = []Domain{}
 var ctx = context.Background()
 
 func main() {
+	prometheus.MustRegister(cacheHit)
+	prometheus.MustRegister(cacheMiss)
+
 	router := gin.Default()
 
 	err := godotenv.Load()
@@ -80,8 +90,10 @@ func main() {
 
 		if hit {
 			c.Header("Cache-Status", "HIT")
+			cacheHit.WithLabelValues(domain.Name).Inc()
 		} else {
 			c.Header("Cache-Status", "MISS")
+			cacheMiss.WithLabelValues(domain.Name).Inc()
 		}
 
 		if file.Encoding == EncodingGZIP {
@@ -110,6 +122,10 @@ func main() {
 		totalDeleted := purge(rdb, domain, c.Query("file"))
 
 		c.JSON(200, gin.H{"total_deleted": totalDeleted})
+	})
+
+	router.GET("/metrics", func(c *gin.Context) {
+		promhttp.Handler().ServeHTTP(c.Writer, c.Request)
 	})
 
 	router.Run()
