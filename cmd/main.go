@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,16 +39,12 @@ type File struct {
 }
 
 type Domain struct {
-	Id   int16
-	Name string
+	Id    int16
+	Name  string
+	Token string
 }
 
-var domains = []Domain{
-	{
-		Id:   1,
-		Name: "code.jquery.com",
-	},
-}
+var domains = []Domain{}
 
 var ctx = context.Background()
 
@@ -64,6 +61,8 @@ func main() {
 		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
+
+	loadDomains()
 
 	router.GET("/g/:domain", func(c *gin.Context) {
 		found, domain := getDomain(c.Param("domain"))
@@ -102,12 +101,31 @@ func main() {
 			return
 		}
 
+		if domain.Token != c.GetHeader("Authorization") {
+			c.JSON(401, gin.H{"message": "Authorization failed!"})
+			return
+		}
+
 		totalDeleted := purge(rdb, domain, c.Query("file"))
 
 		c.JSON(200, gin.H{"total_deleted": totalDeleted})
 	})
 
 	router.Run()
+}
+
+func loadDomains() {
+	file, err := os.Open(os.Getenv("DOMAINS_JSON_FILE_PATH"))
+	if err != nil {
+		panic(err.Error())
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&domains)
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
 func getDomain(domainName string) (found bool, domain Domain) {
