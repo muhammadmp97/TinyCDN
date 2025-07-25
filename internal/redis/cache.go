@@ -14,16 +14,13 @@ import (
 )
 
 func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
-	redisKey := fmt.Sprintf("%s/%s", domain.Name, filePath)
-	acceptsGzip := strings.Contains(headers.Get("Accept-Encoding"), "gzip")
-	isCompressible := utils.IsCompressible(filePath)
+	acceptsGzipAndIsCompressible := strings.Contains(headers.Get("Accept-Encoding"), "gzip") && utils.IsCompressible(filePath)
 	encoding := models.EncodingNone
-	if acceptsGzip && isCompressible {
-		redisKey += ":gzip"
+	if acceptsGzipAndIsCompressible {
 		encoding = models.EncodingGZIP
 	}
 
-	redisKey = fmt.Sprintf("tcdn:d:%d:f:%s", domain.Id, utils.XXHash(redisKey))
+	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
 	redisFile, err := rdb.HGetAll(Ctx, redisKey).Result()
 	if err != nil {
 		panic(err)
@@ -42,15 +39,14 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 		}
 	}
 
-	fileUrl := fmt.Sprintf("https://%s/%s", domain.Name, filePath)
-	ok, body, contentType := utils.FetchFile(fileUrl)
+	ok, body, contentType := utils.FetchFile(fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if !ok {
 		return false, false, models.File{}
 	}
 
 	originalSize := len(body)
 	var content string
-	if acceptsGzip && isCompressible {
+	if acceptsGzipAndIsCompressible {
 		content = utils.Compress(&body)
 	} else {
 		content = string(body)
