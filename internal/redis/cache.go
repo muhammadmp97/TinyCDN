@@ -2,7 +2,6 @@ package redis
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -44,24 +43,10 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 	}
 
 	fileUrl := fmt.Sprintf("https://%s/%s", domain.Name, filePath)
-	resp, err := http.Get(fileUrl)
-
-	if err != nil {
+	ok, body, contentType := utils.FetchFile(fileUrl)
+	if !ok {
 		return false, false, models.File{}
 	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 && resp.StatusCode <= 504 {
-		return false, false, models.File{}
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, false, models.File{}
-	}
-
-	contentType := strings.Split(resp.Header.Get("Content-type"), ";")[0]
 
 	originalSize := len(body)
 	var content string
