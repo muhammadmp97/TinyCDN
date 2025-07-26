@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/muhammadmp97/TinyCDN/internal/handlers"
+	"github.com/muhammadmp97/TinyCDN/internal/middlewares"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/prometheus"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
@@ -19,6 +20,7 @@ func main() {
 	prometheusPkg.MustRegister(prometheus.CacheMiss)
 
 	router := gin.Default()
+	router.Use(middlewares.LogSlowRequests())
 
 	err := godotenv.Load()
 	if err != nil {
