@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/utils"
@@ -29,12 +30,14 @@ func Purge(rdb *redis.Client, domain models.Domain, filePath string) (totalDelet
 		for {
 			keys, nextCursor, err := rdb.Scan(Ctx, cursor, prefix+"*", int64(batchSize)).Result()
 			if err != nil {
-				panic(err)
+				log.Printf("⚠️ rdb.Scan() failed: %v", err)
+				return 0
 			}
 
 			if len(keys) > 0 {
 				if err := rdb.Unlink(Ctx, keys...).Err(); err != nil {
-					panic(err)
+					log.Printf("⚠️ rdb.Unlink() failed: %v", err)
+					return int64(totalDeleted)
 				} else {
 					totalDeleted += len(keys)
 				}

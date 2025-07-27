@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -23,7 +24,8 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
 	redisFile, err := rdb.HGetAll(Ctx, redisKey).Result()
 	if err != nil {
-		panic(err)
+		log.Printf("⚠️ Couldn't get the file from Redis: %v", err)
+		return false, false, models.File{}
 	}
 
 	if len(redisFile) != 0 {
