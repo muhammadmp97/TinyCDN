@@ -14,7 +14,8 @@ TinyCDN is a simple Content Delivery Network (CDN) service implemented in Go. It
 git clone https://github.com/muhammadmp97/TinyCDN.git
 cd TinyCDN
 cp .env.example .env
-docker-compose up --build
+docker-compose up -d
+curl -v http://localhost:8080/g/code.jquery.com?file=jquery-migrate-3.5.2.min.js
 ```
 
 ## Contributing
