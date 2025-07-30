@@ -1,5 +1,5 @@
 # TinyCDN
-<img width="2254" height="860" alt="tinycdn" src="https://github.com/user-attachments/assets/2c5884a7-a26e-4c5f-bec0-76773d712fff" />
+![tinycdn](https://github.com/user-attachments/assets/0c709d69-afbe-4386-a936-8f999254e7dd)
 TinyCDN is a simple Content Delivery Network (CDN) service implemented in Go. It supports caching with Redis, response compression with gzip, and includes monitoring integration with Prometheus.
 
 ## Features
