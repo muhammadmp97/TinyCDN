@@ -75,7 +75,7 @@ func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain model
 	}
 
 	memoryStorageLimit, _ := strconv.Atoi(os.Getenv("MEMORY_STORAGE_LIMIT"))
-	if len(content) < memoryStorageLimit {
+	if len(content) < memoryStorageLimit*1024*1024 {
 		newFile.Content = content
 	} else {
 		objectName := minio.MakeObjectName(filePath)
