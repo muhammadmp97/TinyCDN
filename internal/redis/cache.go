@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	mio "github.com/minio/minio-go/v7"
+	"github.com/muhammadmp97/TinyCDN/internal/minio"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
-func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
+func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
 	acceptsGzipAndIsCompressible := strings.Contains(headers.Get("Accept-Encoding"), "gzip") && utils.IsCompressible(filePath)
 	encoding := models.EncodingNone
 	if acceptsGzipAndIsCompressible {
@@ -31,6 +34,15 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 	if len(redisFile) != 0 {
 		tmpSize, _ := strconv.Atoi(redisFile["Size"])
 		tmpOriginalSize, _ := strconv.Atoi(redisFile["OriginalSize"])
+
+		if redisFile["ContentPath"] != "" {
+			redisFile["Content"], err = minio.Get(c, mio, redisFile["ContentPath"])
+			if err != nil {
+				log.Printf("⚠️ MinIO Error: %v", err)
+				return false, false, models.File{}
+			}
+		}
+
 		return true, true, models.File{
 			Path:         redisFile["Path"],
 			Content:      redisFile["Content"],
@@ -56,16 +68,29 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 
 	newFile := models.File{
 		Path:         filePath,
-		Content:      content,
 		Type:         contentType,
 		Encoding:     encoding,
 		Size:         len(content),
 		OriginalSize: originalSize,
 	}
 
+	memoryStorageLimit, _ := strconv.Atoi(os.Getenv("MEMORY_STORAGE_LIMIT"))
+	if len(content) < memoryStorageLimit {
+		newFile.Content = content
+	} else {
+		objectName := minio.MakeObjectName(filePath)
+		filePath, err := minio.Put(c, mio, objectName, content, contentType)
+		if err != nil {
+			log.Printf("⚠️ MinIO Error: %v", err)
+		}
+
+		newFile.ContentPath = filePath
+	}
+
 	rdb.HSet(Ctx, redisKey, map[string]interface{}{
 		"Path":         newFile.Path,
 		"Content":      newFile.Content,
+		"ContentPath":  newFile.ContentPath,
 		"Type":         newFile.Type,
 		"Encoding":     strconv.Itoa(int(newFile.Encoding)),
 		"Size":         strconv.Itoa(newFile.Size),
@@ -74,6 +99,10 @@ func GetFile(rdb *redis.Client, domain models.Domain, filePath string, headers h
 
 	ttl, _ := strconv.Atoi(os.Getenv("FILE_CACHE_TTL"))
 	rdb.Expire(Ctx, redisKey, time.Second*time.Duration(ttl))
+
+	if newFile.ContentPath != "" {
+		newFile.Content = content
+	}
 
 	return true, false, newFile
 }

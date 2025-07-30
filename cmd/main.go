@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/muhammadmp97/TinyCDN/internal/handlers"
 	"github.com/muhammadmp97/TinyCDN/internal/middlewares"
+	"github.com/muhammadmp97/TinyCDN/internal/minio"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/prometheus"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
@@ -30,9 +31,14 @@ func main() {
 	rdb := redis.NewClient()
 	defer rdb.Close()
 
+	mio, err := minio.NewClient()
+	if err != nil {
+		panic("Minio connection failed!")
+	}
+
 	loadDomains()
 
-	router.GET("/g/:domain", handlers.ServeFileHandler(rdb))
+	router.GET("/g/:domain", handlers.ServeFileHandler(rdb, mio))
 
 	router.POST("/purge/:domain", handlers.PurgeHandler(rdb))
 

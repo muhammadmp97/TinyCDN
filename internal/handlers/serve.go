@@ -4,13 +4,14 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/prometheus"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
 	redisPkg "github.com/redis/go-redis/v9"
 )
 
-func ServeFileHandler(rdb *redisPkg.Client) gin.HandlerFunc {
+func ServeFileHandler(rdb *redisPkg.Client, minio *minio.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		found, domain := models.GetDomain(c.Param("domain"))
 		if !found {
@@ -18,7 +19,7 @@ func ServeFileHandler(rdb *redisPkg.Client) gin.HandlerFunc {
 			return
 		}
 
-		found, hit, file := redis.GetFile(rdb, domain, c.Query("file"), c.Request.Header)
+		found, hit, file := redis.GetFile(c, rdb, minio, domain, c.Query("file"), c.Request.Header)
 		if !found {
 			c.String(404, "File not found!")
 			return

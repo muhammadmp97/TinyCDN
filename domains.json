@@ -3,5 +3,10 @@
         "id": 1,
         "name": "code.jquery.com",
         "token": "9b09b39491d3fdeefe996162e9a629ee"
+    },
+    {
+        "id": 1,
+        "name": "images.pexels.com",
+        "token": "88acbfdee1d3a22efe1a1165f88100ff"
     }
 ]

@@ -10,6 +10,7 @@ const (
 type File struct {
 	Path         string
 	Content      string
+	ContentPath  string
 	Type         string
 	Encoding     Encoding
 	Size         int
