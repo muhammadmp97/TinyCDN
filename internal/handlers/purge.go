@@ -4,10 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
-	redisPkg "github.com/redis/go-redis/v9"
+	rds "github.com/redis/go-redis/v9"
 )
 
-func PurgeHandler(rdb *redisPkg.Client) gin.HandlerFunc {
+func PurgeHandler(rdb *rds.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		found, domain := models.GetDomain(c.Param("domain"))
 		if !found {
