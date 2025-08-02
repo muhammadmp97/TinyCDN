@@ -3,18 +3,9 @@ package utils
 import (
 	"bytes"
 	"compress/gzip"
-	"net/url"
-	"path"
-	"path/filepath"
-	"strings"
 )
 
 func IsCompressible(filePath string) bool {
-	parsedURL, err := url.Parse(filePath)
-	if err != nil {
-		return false
-	}
-
 	allowedExtensions := []string{
 		".html",
 		".css",
@@ -25,7 +16,10 @@ func IsCompressible(filePath string) bool {
 		".txt",
 	}
 
-	fileExt := strings.ToLower(filepath.Ext(path.Base(parsedURL.Path)))
+	fileExt := GetExtension(filePath)
+	if fileExt == "" {
+		return false
+	}
 
 	for _, allowedExtension := range allowedExtensions {
 		if fileExt == allowedExtension {

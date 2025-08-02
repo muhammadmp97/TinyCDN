@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	"github.com/muhammadmp97/TinyCDN/internal/config"
 	"github.com/muhammadmp97/TinyCDN/internal/handlers"
 	"github.com/muhammadmp97/TinyCDN/internal/middlewares"
 	"github.com/muhammadmp97/TinyCDN/internal/minio"
@@ -23,22 +23,22 @@ func main() {
 	router := gin.Default()
 	router.Use(middlewares.LogSlowRequests())
 
-	err := godotenv.Load()
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		panic("No .env file found!")
+		panic(err)
 	}
 
-	rdb := redis.NewClient()
+	rdb := redis.NewClient(cfg)
 	defer rdb.Close()
 
-	mio, err := minio.NewClient()
+	mio, err := minio.NewClient(cfg)
 	if err != nil {
 		panic("Minio connection failed!")
 	}
 
-	loadDomains()
+	loadDomains(cfg)
 
-	router.GET("/g/:domain", handlers.ServeFileHandler(rdb, mio))
+	router.GET("/g/:domain", handlers.ServeFileHandler(cfg, rdb, mio))
 
 	router.POST("/purge/:domain", handlers.PurgeHandler(rdb))
 
@@ -49,8 +49,8 @@ func main() {
 	router.Run()
 }
 
-func loadDomains() {
-	file, err := os.Open(os.Getenv("DOMAINS_JSON_FILE_PATH"))
+func loadDomains(cfg *config.Config) {
+	file, err := os.Open(cfg.DomainsJsonFilePath)
 	if err != nil {
 		panic(err.Error())
 	}

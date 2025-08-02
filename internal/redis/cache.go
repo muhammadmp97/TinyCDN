@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	mio "github.com/minio/minio-go/v7"
+	"github.com/muhammadmp97/TinyCDN/internal/config"
 	"github.com/muhammadmp97/TinyCDN/internal/minio"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/utils"
 	"github.com/redis/go-redis/v9"
 )
 
-func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
+func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
 	acceptsGzipAndIsCompressible := strings.Contains(headers.Get("Accept-Encoding"), "gzip") && utils.IsCompressible(filePath)
 	encoding := models.EncodingNone
 	if acceptsGzipAndIsCompressible {
@@ -36,7 +36,7 @@ func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain model
 		tmpOriginalSize, _ := strconv.Atoi(redisFile["OriginalSize"])
 
 		if redisFile["ContentPath"] != "" {
-			redisFile["Content"], err = minio.Get(c, mio, redisFile["ContentPath"])
+			redisFile["Content"], err = minio.Get(c, cfg, mio, redisFile["ContentPath"])
 			if err != nil {
 				log.Printf("⚠️ MinIO Error: %v", err)
 				return false, false, models.File{}
@@ -74,12 +74,11 @@ func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain model
 		OriginalSize: originalSize,
 	}
 
-	memoryStorageLimit, _ := strconv.Atoi(os.Getenv("MEMORY_STORAGE_LIMIT"))
-	if len(content) < memoryStorageLimit*1024*1024 {
+	if len(content) < cfg.MemoryStorageLimit*1024*1024 {
 		newFile.Content = content
 	} else {
 		objectName := minio.MakeObjectName(filePath)
-		filePath, err := minio.Put(c, mio, objectName, content, contentType)
+		filePath, err := minio.Put(c, cfg, mio, objectName, content, contentType)
 		if err != nil {
 			log.Printf("⚠️ MinIO Error: %v", err)
 		}
@@ -97,8 +96,7 @@ func GetFile(c context.Context, rdb *redis.Client, mio *mio.Client, domain model
 		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
 	})
 
-	ttl, _ := strconv.Atoi(os.Getenv("FILE_CACHE_TTL"))
-	rdb.Expire(Ctx, redisKey, time.Second*time.Duration(ttl))
+	rdb.Expire(Ctx, redisKey, time.Second*time.Duration(cfg.FileCacheTTL))
 
 	if newFile.ContentPath != "" {
 		newFile.Content = content

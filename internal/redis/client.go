@@ -2,17 +2,17 @@ package redis
 
 import (
 	"context"
-	"os"
 
+	"github.com/muhammadmp97/TinyCDN/internal/config"
 	"github.com/redis/go-redis/v9"
 )
 
 var Ctx = context.Background()
 
-func NewClient() *redis.Client {
+func NewClient(cfg *config.Config) *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("REDIS_ADDRESS"),
-		Password: os.Getenv("REDIS_PASSWORD"),
+		Addr:     cfg.RedisAddress,
+		Password: cfg.RedisPassword,
 		DB:       0,
 	})
 }
