@@ -16,9 +16,6 @@ WORKDIR /app
 
 COPY --from=builder /app/tinycdn .
 
-COPY domains.json ./config.json
-COPY .env .env
-
 EXPOSE 8080
 
 CMD ["./tinycdn"]

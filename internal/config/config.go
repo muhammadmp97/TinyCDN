@@ -24,7 +24,6 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.SetConfigType("env")
-	viper.AutomaticEnv()
 
 	viper.SetDefault("FILE_CACHE_TTL", 3600)
 

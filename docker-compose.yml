@@ -4,10 +4,9 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     container_name: tinycdn
-    env_file:
-      - .env
     volumes:
       - ./domains.json:/app/domains.json:ro
+      - ./.env:/app/.env:ro
     ports:
       - "8080:8080"
     depends_on:
