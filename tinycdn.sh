@@ -36,8 +36,6 @@ start() {
     if ! docker compose start > /dev/null 2>&1; then
         echo -e "\e[31mYou haven't created the containers yet!\nRun the command \e[3m./tinycdn up\e[0m\e[0m" >&2
     else
-
-        echo "
 }
 
 stop() {
