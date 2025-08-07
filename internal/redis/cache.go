@@ -25,7 +25,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 	}
 
 	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
-	redisFile, err := rdb.HGetAll(Ctx, redisKey).Result()
+	redisFile, err := rdb.HGetAll(c, redisKey).Result()
 	if err != nil {
 		log.Printf("⚠️ Couldn't get the file from Redis: %v", err)
 		return false, false, models.File{}
@@ -86,7 +86,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		newFile.ContentPath = filePath
 	}
 
-	rdb.HSet(Ctx, redisKey, map[string]interface{}{
+	rdb.HSet(c, redisKey, map[string]interface{}{
 		"Path":         newFile.Path,
 		"Content":      newFile.Content,
 		"ContentPath":  newFile.ContentPath,
@@ -96,7 +96,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
 	})
 
-	rdb.Expire(Ctx, redisKey, time.Second*time.Duration(cfg.FileCacheTTL))
+	rdb.Expire(c, redisKey, time.Second*time.Duration(cfg.FileCacheTTL))
 
 	if newFile.ContentPath != "" {
 		newFile.Content = content

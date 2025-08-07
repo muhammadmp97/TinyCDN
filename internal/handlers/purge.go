@@ -20,7 +20,7 @@ func PurgeHandler(rdb *rds.Client) gin.HandlerFunc {
 			return
 		}
 
-		totalDeleted := redis.Purge(rdb, domain, c.Query("file"))
+		totalDeleted := redis.Purge(c, rdb, domain, c.Query("file"))
 
 		c.JSON(200, gin.H{"total_deleted": totalDeleted})
 	}
