@@ -3,7 +3,6 @@ package utils
 import (
 	"io"
 	"net/http"
-	"strings"
 )
 
 func FetchFile(fileUrl string) (ok bool, body []byte, contentType string) {
@@ -24,7 +23,7 @@ func FetchFile(fileUrl string) (ok bool, body []byte, contentType string) {
 		return false, nil, ""
 	}
 
-	contentType = strings.Split(resp.Header.Get("Content-type"), ";")[0]
+	contentType = http.DetectContentType(body)
 
 	return true, body, contentType
 }
