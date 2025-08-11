@@ -19,6 +19,7 @@ import (
 func main() {
 	prometheusPkg.MustRegister(prometheus.CacheHit)
 	prometheusPkg.MustRegister(prometheus.CacheMiss)
+	prometheusPkg.MustRegister(prometheus.ServeLatency)
 
 	router := gin.Default()
 	router.Use(middlewares.LogSlowRequests())

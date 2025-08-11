@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/minio/minio-go/v7"
@@ -25,6 +26,12 @@ func ServeFileHandler(cfg *config.Config, rdb *rds.Client, minio *minio.Client) 
 			c.String(404, "File not found!")
 			return
 		}
+
+		start := time.Now()
+		defer func() {
+			elapsed := time.Since(start).Seconds()
+			prometheus.ServeLatency.WithLabelValues(domain.Name).Observe(elapsed)
+		}()
 
 		if hit {
 			c.Header("Cache-Status", "HIT")
