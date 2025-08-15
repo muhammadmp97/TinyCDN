@@ -17,7 +17,7 @@ up() {
         docker compose up -d
         while true; do
             if (docker compose ps | grep minio | grep Up) > /dev/null 2>&1; then
-                docker exec -it tinycdn-minio /bin/sh -c "mc alias set local http://$MINIO_ADDRESS $MINIO_USER $MINIO_PASSWORD && mc mb local/$MINIO_BUCKET_NAME" > /dev/null 2>&1 \
+                cat ./docker/minio.json | docker exec -i tinycdn-minio /bin/sh -c "mc alias set local http://$MINIO_ADDRESS $MINIO_USER $MINIO_PASSWORD && mc mb local/$MINIO_BUCKET_NAME && mc ilm import local/$MINIO_BUCKET_NAME" > /dev/null 2>&1 \
                     && echo -e "\e[32mBucket created successfully!\e[0m"
                 break
             fi

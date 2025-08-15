@@ -13,5 +13,17 @@ func MakeObjectName(filePath string) string {
 
 	ext := utils.GetExtension(filePath)
 
-	return fmt.Sprintf("%s_%s%s", timestamp, utils.XXHash(filePath), ext)
+	var directory string
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".avif":
+		directory = "photos"
+	case ".css", ".js":
+		directory = "assets"
+	case ".woff", ".woff2", ".ttf", ".otf":
+		directory = "fonts"
+	default:
+		directory = "files"
+	}
+
+	return fmt.Sprintf("%s/%s_%s%s", directory, timestamp, utils.XXHash(filePath), ext)
 }

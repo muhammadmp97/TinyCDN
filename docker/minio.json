@@ -1,0 +1,44 @@
+{
+    "Rules": [
+        {
+            "ID": "delete-photos",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "photos"
+            },
+            "Expiration": {
+                "Days": 7
+            }
+        },
+        {
+            "ID": "delete-assets",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "assets"
+            },
+            "Expiration": {
+                "Days": 3
+            }
+        },
+        {
+            "ID": "delete-fonts",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "fonts"
+            },
+            "Expiration": {
+                "Days": 30
+            }
+        },
+        {
+            "ID": "delete-other-files",
+            "Status": "Enabled",
+            "Filter": {
+                "Prefix": "files"
+            },
+            "Expiration": {
+                "Days": 14
+            }
+        }
+    ]
+}

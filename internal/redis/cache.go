@@ -96,7 +96,16 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
 	})
 
-	rdb.Expire(c, redisKey, time.Second*time.Duration(cfg.FileCacheTTL))
+	ttl := 14
+	if strings.HasPrefix(filePath, "photos") {
+		ttl = 7 * 24 * 3600
+	} else if strings.HasPrefix(filePath, "assets") {
+		ttl = 3 * 24 * 3600
+	} else if strings.HasPrefix(filePath, "fonts") {
+		ttl = 30 * 24 * 3600
+	}
+
+	rdb.Expire(c, redisKey, time.Second*time.Duration(ttl))
 
 	if newFile.ContentPath != "" {
 		newFile.Content = content
