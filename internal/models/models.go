@@ -15,6 +15,7 @@ type File struct {
 	Encoding     Encoding
 	Size         int
 	OriginalSize int
+	TTL          int
 }
 
 type Domain struct {

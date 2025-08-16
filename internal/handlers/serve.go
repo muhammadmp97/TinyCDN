@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -39,6 +40,10 @@ func ServeFileHandler(cfg *config.Config, rdb *rds.Client, minio *minio.Client) 
 		} else {
 			c.Header("Cache-Status", "MISS")
 			prometheus.CacheMiss.WithLabelValues(domain.Name).Inc()
+		}
+
+		if file.TTL > 0 {
+			c.Header("Cache-Control", fmt.Sprintf("max-age=%d", file.TTL))
 		}
 
 		if file.Encoding == models.EncodingGZIP {

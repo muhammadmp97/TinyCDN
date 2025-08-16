@@ -34,6 +34,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 	if len(redisFile) != 0 {
 		tmpSize, _ := strconv.Atoi(redisFile["Size"])
 		tmpOriginalSize, _ := strconv.Atoi(redisFile["OriginalSize"])
+		ttl, _ := strconv.Atoi(redisFile["TTL"])
 
 		if redisFile["ContentPath"] != "" {
 			redisFile["Content"], err = minio.Get(c, cfg, mio, redisFile["ContentPath"])
@@ -50,6 +51,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 			Encoding:     encoding,
 			Size:         tmpSize,
 			OriginalSize: tmpOriginalSize,
+			TTL:          ttl,
 		}
 	}
 
@@ -86,17 +88,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		newFile.ContentPath = filePath
 	}
 
-	rdb.HSet(c, redisKey, map[string]interface{}{
-		"Path":         newFile.Path,
-		"Content":      newFile.Content,
-		"ContentPath":  newFile.ContentPath,
-		"Type":         newFile.Type,
-		"Encoding":     strconv.Itoa(int(newFile.Encoding)),
-		"Size":         strconv.Itoa(newFile.Size),
-		"OriginalSize": strconv.Itoa(newFile.OriginalSize),
-	})
-
-	ttl := 14
+	ttl := 14 * 24 * 3600
 	if strings.HasPrefix(filePath, "photos") {
 		ttl = 7 * 24 * 3600
 	} else if strings.HasPrefix(filePath, "assets") {
@@ -105,11 +97,24 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		ttl = 30 * 24 * 3600
 	}
 
+	rdb.HSet(c, redisKey, map[string]interface{}{
+		"Path":         newFile.Path,
+		"Content":      newFile.Content,
+		"ContentPath":  newFile.ContentPath,
+		"Type":         newFile.Type,
+		"Encoding":     strconv.Itoa(int(newFile.Encoding)),
+		"Size":         newFile.Size,
+		"OriginalSize": newFile.OriginalSize,
+		"TTL":          ttl,
+	})
+
 	rdb.Expire(c, redisKey, time.Second*time.Duration(ttl))
 
 	if newFile.ContentPath != "" {
 		newFile.Content = content
 	}
+
+	newFile.TTL = ttl
 
 	return true, false, newFile
 }
