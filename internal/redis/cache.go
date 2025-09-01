@@ -83,6 +83,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		filePath, err := minio.Put(c, cfg, mio, objectName, content, contentType)
 		if err != nil {
 			log.Printf("⚠️ MinIO Error: %v", err)
+			return false, false, models.File{}
 		}
 
 		newFile.ContentPath = filePath
