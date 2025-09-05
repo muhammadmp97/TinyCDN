@@ -57,6 +57,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 
 	body, contentType, err := utils.FetchFile(fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if err != nil {
+		log.Printf("⚠️ FetchFile Error: %v", err)
 		return false, false, models.File{}
 	}
 
