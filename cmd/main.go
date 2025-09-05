@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/muhammadmp97/TinyCDN/internal/app"
 	"github.com/muhammadmp97/TinyCDN/internal/config"
 	"github.com/muhammadmp97/TinyCDN/internal/handlers"
 	"github.com/muhammadmp97/TinyCDN/internal/middlewares"
@@ -37,11 +38,13 @@ func main() {
 		panic("Minio connection failed!")
 	}
 
-	loadDomains(cfg)
+	app := app.New(cfg, rdb, mio)
 
-	router.GET("/g/:domain", handlers.ServeFileHandler(cfg, rdb, mio))
+	loadDomains(app.Config)
 
-	router.POST("/purge/:domain", handlers.PurgeHandler(rdb))
+	router.GET("/g/:domain", handlers.ServeFileHandler(app))
+
+	router.POST("/purge/:domain", handlers.PurgeHandler(app))
 
 	router.GET("/metrics", func(c *gin.Context) {
 		promhttp.Handler().ServeHTTP(c.Writer, c.Request)

@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/muhammadmp97/TinyCDN/internal/app"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
-	rds "github.com/redis/go-redis/v9"
 )
 
-func PurgeHandler(rdb *rds.Client) gin.HandlerFunc {
+func PurgeHandler(app *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		found, domain := models.GetDomain(c.Param("domain"))
 		if !found {
@@ -20,7 +20,7 @@ func PurgeHandler(rdb *rds.Client) gin.HandlerFunc {
 			return
 		}
 
-		totalDeleted := redis.Purge(c, rdb, domain, c.Query("file"))
+		totalDeleted := redis.Purge(c, app.Redis, domain, c.Query("file"))
 
 		c.JSON(200, gin.H{"total_deleted": totalDeleted})
 	}
