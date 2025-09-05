@@ -20,7 +20,7 @@ func ServeFileHandler(app *app.App) gin.HandlerFunc {
 			return
 		}
 
-		found, hit, file := redis.GetFile(c, app.Config, app.Redis, app.MinIO, domain, c.Query("file"), c.Request.Header)
+		found, hit, file := redis.GetFile(c, app, domain, c.Query("file"), c.Request.Header)
 		if !found {
 			c.String(404, "File not found!")
 			return

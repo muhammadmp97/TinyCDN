@@ -3,21 +3,19 @@ package redis
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	mio "github.com/minio/minio-go/v7"
-	"github.com/muhammadmp97/TinyCDN/internal/config"
+	"github.com/muhammadmp97/TinyCDN/internal/app"
 	"github.com/muhammadmp97/TinyCDN/internal/minio"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/utils"
-	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
-func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.Client, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
+func GetFile(c context.Context, app *app.App, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
 	acceptsGzipAndIsCompressible := strings.Contains(headers.Get("Accept-Encoding"), "gzip") && utils.IsCompressible(filePath)
 	encoding := models.EncodingNone
 	if acceptsGzipAndIsCompressible {
@@ -25,9 +23,9 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 	}
 
 	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
-	redisFile, err := rdb.HGetAll(c, redisKey).Result()
+	redisFile, err := app.Redis.HGetAll(c, redisKey).Result()
 	if err != nil {
-		log.Printf("⚠️ Couldn't get the file from Redis: %v", err)
+		app.Logger.Error(fmt.Sprintf("Couldn't get the file from Redis: %v", err))
 		return false, false, models.File{}
 	}
 
@@ -37,9 +35,9 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		ttl, _ := strconv.Atoi(redisFile["TTL"])
 
 		if redisFile["ContentPath"] != "" {
-			redisFile["Content"], err = minio.Get(c, cfg, mio, redisFile["ContentPath"])
+			redisFile["Content"], err = minio.Get(c, app.Config, app.MinIO, redisFile["ContentPath"])
 			if err != nil {
-				log.Printf("⚠️ MinIO Error: %v", err)
+				app.Logger.Error(fmt.Sprintf("MinIO Error: %v", err))
 				return false, false, models.File{}
 			}
 		}
@@ -57,7 +55,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 
 	body, contentType, err := utils.FetchFile(fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if err != nil {
-		log.Printf("⚠️ FetchFile Error: %v", err)
+		app.Logger.Error(fmt.Sprintf("FetchFile Error: %v", err), zap.String("url", fmt.Sprintf("https://%s/%s", domain.Name, filePath)))
 		return false, false, models.File{}
 	}
 
@@ -77,13 +75,13 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		OriginalSize: originalSize,
 	}
 
-	if len(content) < cfg.MemoryStorageLimit*1024*1024 {
+	if len(content) < app.Config.MemoryStorageLimit*1024*1024 {
 		newFile.Content = content
 	} else {
 		objectName := minio.MakeObjectName(filePath)
-		filePath, err := minio.Put(c, cfg, mio, objectName, content, contentType)
+		filePath, err := minio.Put(c, app.Config, app.MinIO, objectName, content, contentType)
 		if err != nil {
-			log.Printf("⚠️ MinIO Error: %v", err)
+			app.Logger.Error(fmt.Sprintf("MinIO Error: %v", err))
 			return false, false, models.File{}
 		}
 
@@ -99,7 +97,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		ttl = 30 * 24 * 3600
 	}
 
-	rdb.HSet(c, redisKey, map[string]interface{}{
+	app.Redis.HSet(c, redisKey, map[string]interface{}{
 		"Path":         newFile.Path,
 		"Content":      newFile.Content,
 		"ContentPath":  newFile.ContentPath,
@@ -110,7 +108,7 @@ func GetFile(c context.Context, cfg *config.Config, rdb *redis.Client, mio *mio.
 		"TTL":          ttl,
 	})
 
-	rdb.Expire(c, redisKey, time.Second*time.Duration(ttl))
+	app.Redis.Expire(c, redisKey, time.Second*time.Duration(ttl))
 
 	if newFile.ContentPath != "" {
 		newFile.Content = content

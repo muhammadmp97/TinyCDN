@@ -15,6 +15,7 @@ import (
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
 	prometheusPkg "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -22,13 +23,17 @@ func main() {
 	prometheusPkg.MustRegister(prometheus.CacheMiss)
 	prometheusPkg.MustRegister(prometheus.ServeLatency)
 
-	router := gin.Default()
-	router.Use(middlewares.LogSlowRequests())
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
+
+	logger := zap.Must(zap.NewProduction())
+	defer logger.Sync()
 
 	rdb := redis.NewClient(cfg)
 	defer rdb.Close()
@@ -38,9 +43,11 @@ func main() {
 		panic("Minio connection failed!")
 	}
 
-	app := app.New(cfg, rdb, mio)
+	app := app.New(cfg, logger, rdb, mio)
 
 	loadDomains(app.Config)
+
+	router.Use(middlewares.LogSlowRequests(app))
 
 	router.GET("/g/:domain", handlers.ServeFileHandler(app))
 

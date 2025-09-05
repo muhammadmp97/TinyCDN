@@ -1,13 +1,14 @@
 package middlewares
 
 import (
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/muhammadmp97/TinyCDN/internal/app"
+	"go.uber.org/zap"
 )
 
-func LogSlowRequests() gin.HandlerFunc {
+func LogSlowRequests(app *app.App) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -16,7 +17,10 @@ func LogSlowRequests() gin.HandlerFunc {
 		duration := time.Since(start).Milliseconds()
 
 		if c.FullPath() == "/g/:domain" && duration > 500 {
-			log.Printf("⚠️ SLOW: %dms - %s", duration, c.Request.RequestURI)
+			app.Logger.Warn("SLOW: %dms - %s",
+				zap.Int64("duration", duration),
+				zap.String("url", c.Request.RequestURI),
+			)
 		}
 	}
 }
