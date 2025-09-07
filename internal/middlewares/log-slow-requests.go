@@ -17,7 +17,7 @@ func LogSlowRequests(app *app.App) gin.HandlerFunc {
 		duration := time.Since(start).Milliseconds()
 
 		if c.FullPath() == "/g/:domain" && duration > 500 {
-			app.Logger.Warn("SLOW: %dms - %s",
+			app.Logger.Warn("Slow request",
 				zap.Int64("duration", duration),
 				zap.String("url", c.Request.RequestURI),
 			)
