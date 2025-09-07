@@ -53,13 +53,19 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 		}
 	}
 
-	body, contentType, err := utils.FetchFile(fmt.Sprintf("https://%s/%s", domain.Name, filePath))
+	body, contentType, err := utils.FetchFile(app.Config, fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if err != nil {
 		app.Logger.Error(fmt.Sprintf("FetchFile Error: %v", err), zap.String("url", fmt.Sprintf("https://%s/%s", domain.Name, filePath)))
 		return false, false, models.File{}
 	}
 
 	originalSize := len(body)
+
+	// We cannot rely only on the content-length header
+	if originalSize > app.Config.FileSizeLimit*1024*1024 {
+		return false, false, models.File{}
+	}
+
 	var content string
 	if acceptsGzipAndIsCompressible {
 		content = utils.Compress(&body)
