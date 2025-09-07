@@ -22,7 +22,7 @@ func ServeFileHandler(app *app.App) gin.HandlerFunc {
 			return
 		}
 
-		hit, file, err := redis.GetFile(c, app, domain, c.Query("file"), c.Request.Header)
+		hit, file, err := redis.GetFile(c.Request.Context(), app, domain, c.Query("file"), c.Request.Header)
 		if err != nil && errors.Is(err, errs.ErrFileSizeLimit) {
 			c.String(413, "File is too large!")
 			return

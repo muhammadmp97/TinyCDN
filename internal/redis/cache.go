@@ -24,6 +24,8 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 	}
 
 	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
+	c, cancel := context.WithTimeout(c, 2*time.Second)
+	defer cancel()
 	redisFile, err := app.Redis.HGetAll(c, redisKey).Result()
 	if err != nil {
 		app.Logger.Error(fmt.Sprintf("Couldn't get the file from Redis: %v", err))
