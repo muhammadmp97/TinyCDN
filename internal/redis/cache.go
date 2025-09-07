@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/muhammadmp97/TinyCDN/internal/app"
+	errs "github.com/muhammadmp97/TinyCDN/internal/errors"
 	"github.com/muhammadmp97/TinyCDN/internal/minio"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/utils"
 	"go.uber.org/zap"
 )
 
-func GetFile(c context.Context, app *app.App, domain models.Domain, filePath string, headers http.Header) (found bool, hit bool, file models.File) {
+func GetFile(c context.Context, app *app.App, domain models.Domain, filePath string, headers http.Header) (hit bool, file models.File, err error) {
 	acceptsGzipAndIsCompressible := strings.Contains(headers.Get("Accept-Encoding"), "gzip") && utils.IsCompressible(filePath)
 	encoding := models.EncodingNone
 	if acceptsGzipAndIsCompressible {
@@ -26,7 +27,7 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 	redisFile, err := app.Redis.HGetAll(c, redisKey).Result()
 	if err != nil {
 		app.Logger.Error(fmt.Sprintf("Couldn't get the file from Redis: %v", err))
-		return false, false, models.File{}
+		return false, models.File{}, errs.ErrRedisCannotGet
 	}
 
 	if len(redisFile) != 0 {
@@ -38,11 +39,11 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 			redisFile["Content"], err = minio.Get(c, app.Config, app.MinIO, redisFile["ContentPath"])
 			if err != nil {
 				app.Logger.Error(fmt.Sprintf("MinIO Error: %v", err))
-				return false, false, models.File{}
+				return false, models.File{}, errs.ErrMinIOCannotGet
 			}
 		}
 
-		return true, true, models.File{
+		return true, models.File{
 			Path:         redisFile["Path"],
 			Content:      redisFile["Content"],
 			Type:         redisFile["Type"],
@@ -50,22 +51,16 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 			Size:         tmpSize,
 			OriginalSize: tmpOriginalSize,
 			TTL:          ttl,
-		}
+		}, nil
 	}
 
 	body, contentType, err := utils.FetchFile(app.Config, fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if err != nil {
-		app.Logger.Error(fmt.Sprintf("FetchFile Error: %v", err), zap.String("url", fmt.Sprintf("https://%s/%s", domain.Name, filePath)))
-		return false, false, models.File{}
+		app.Logger.Warn(fmt.Sprintf("FetchFile Error: %v", err), zap.String("url", fmt.Sprintf("https://%s/%s", domain.Name, filePath)))
+		return false, models.File{}, err
 	}
 
 	originalSize := len(body)
-
-	// We cannot rely only on the content-length header
-	if originalSize > app.Config.FileSizeLimit*1024*1024 {
-		return false, false, models.File{}
-	}
-
 	var content string
 	if acceptsGzipAndIsCompressible {
 		content = utils.Compress(&body)
@@ -88,7 +83,7 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 		filePath, err := minio.Put(c, app.Config, app.MinIO, objectName, content, contentType)
 		if err != nil {
 			app.Logger.Error(fmt.Sprintf("MinIO Error: %v", err))
-			return false, false, models.File{}
+			return false, models.File{}, errs.ErrMinIOCannotPut
 		}
 
 		newFile.ContentPath = filePath
@@ -122,5 +117,5 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 
 	newFile.TTL = ttl
 
-	return true, false, newFile
+	return false, newFile, nil
 }

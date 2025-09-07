@@ -1,13 +1,13 @@
 package utils
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/muhammadmp97/TinyCDN/internal/config"
+	errs "github.com/muhammadmp97/TinyCDN/internal/errors"
 )
 
 func FetchFile(cfg *config.Config, fileUrl string) (body []byte, contentType string, err error) {
@@ -20,7 +20,7 @@ func FetchFile(cfg *config.Config, fileUrl string) (body []byte, contentType str
 
 	if contentLength := headResp.Header.Get("Content-Length"); contentLength != "" {
 		if size, err := strconv.Atoi(contentLength); err == nil && int(size) > cfg.FileSizeLimit*1024*1024 {
-			return nil, "", fmt.Errorf("file too large")
+			return nil, "", errs.ErrFileSizeLimit
 		}
 	}
 	headResp.Body.Close()
@@ -39,6 +39,11 @@ func FetchFile(cfg *config.Config, fileUrl string) (body []byte, contentType str
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, "", err
+	}
+
+	// We cannot rely only on content-length header
+	if len(body) > cfg.FileSizeLimit*1024*1024 {
+		return nil, "", errs.ErrFileSizeLimit
 	}
 
 	contentType = http.DetectContentType(body)

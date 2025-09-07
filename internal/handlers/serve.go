@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/muhammadmp97/TinyCDN/internal/app"
+	errs "github.com/muhammadmp97/TinyCDN/internal/errors"
 	"github.com/muhammadmp97/TinyCDN/internal/models"
 	"github.com/muhammadmp97/TinyCDN/internal/prometheus"
 	"github.com/muhammadmp97/TinyCDN/internal/redis"
@@ -20,8 +22,11 @@ func ServeFileHandler(app *app.App) gin.HandlerFunc {
 			return
 		}
 
-		found, hit, file := redis.GetFile(c, app, domain, c.Query("file"), c.Request.Header)
-		if !found {
+		hit, file, err := redis.GetFile(c, app, domain, c.Query("file"), c.Request.Header)
+		if err != nil && errors.Is(err, errs.ErrFileSizeLimit) {
+			c.String(413, "File is too large!")
+			return
+		} else if err != nil {
 			c.String(404, "File not found!")
 			return
 		}
