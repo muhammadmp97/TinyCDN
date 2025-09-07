@@ -24,7 +24,7 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 	}
 
 	redisKey := utils.MakeRedisKey(domain, filePath, acceptsGzipAndIsCompressible)
-	c, cancel := context.WithTimeout(c, 2*time.Second)
+	c, cancel := context.WithTimeout(c, 4*time.Second)
 	defer cancel()
 	redisFile, err := app.Redis.HGetAll(c, redisKey).Result()
 	if err != nil {
@@ -56,7 +56,7 @@ func GetFile(c context.Context, app *app.App, domain models.Domain, filePath str
 		}, nil
 	}
 
-	body, contentType, err := utils.FetchFile(app.Config, fmt.Sprintf("https://%s/%s", domain.Name, filePath))
+	body, contentType, err := utils.FetchFile(c, app.Config, fmt.Sprintf("https://%s/%s", domain.Name, filePath))
 	if err != nil {
 		app.Logger.Warn(fmt.Sprintf("FetchFile Error: %v", err), zap.String("url", fmt.Sprintf("https://%s/%s", domain.Name, filePath)))
 		return false, models.File{}, err
