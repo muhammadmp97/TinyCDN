@@ -26,7 +26,6 @@ func LoadConfig() (*Config, error) {
 	viper.SetConfigFile(".env")
 	viper.SetConfigType("env")
 
-	viper.SetDefault("FILE_CACHE_TTL", 3600) // TODO this is not used
 	viper.SetDefault("FILE_SIZE_LIMIT", 100)
 
 	if err := viper.ReadInConfig(); err != nil {
